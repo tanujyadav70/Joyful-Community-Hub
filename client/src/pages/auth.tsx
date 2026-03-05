@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, ArrowRight, UserPlus, LogIn } from "lucide-react";
 import authBg from "@/assets/images/auth-bg.png";
 import { Input } from "@/components/ui/input";
