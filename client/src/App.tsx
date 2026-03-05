@@ -5,13 +5,36 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
+// Pages
+import AuthPage from "@/pages/auth";
+import HomeFeed from "@/pages/home";
+import EventsPage from "@/pages/events";
+import StudentDashboard from "@/pages/student-dashboard";
+import AdminDashboard from "@/pages/admin-dashboard";
+import ProfilePage from "@/pages/profile";
+
+import AppLayout from "@/components/layout/AppLayout";
+
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
-      <Route component={NotFound} />
+      <Route path="/" component={AuthPage} />
+      <Route path="/login" component={AuthPage} />
+      <Route path="/register" component={AuthPage} />
+      
+      {/* Protected Routes wrapped in AppLayout */}
+      <Route path="/:rest*">
+        <AppLayout>
+          <Switch>
+            <Route path="/home" component={HomeFeed} />
+            <Route path="/events" component={EventsPage} />
+            <Route path="/student/dashboard" component={StudentDashboard} />
+            <Route path="/admin/dashboard" component={AdminDashboard} />
+            <Route path="/profile/:id" component={ProfilePage} />
+            <Route component={NotFound} />
+          </Switch>
+        </AppLayout>
+      </Route>
     </Switch>
   );
 }
