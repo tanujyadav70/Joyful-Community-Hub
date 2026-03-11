@@ -1,84 +1,143 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar, MapPin, Clock, Users, Sparkles, Filter, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import confetti from "canvas-confetti";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
-const MOCK_EVENTS = [
-  {
-    id: 1,
-    title: "Sunset Yoga on the Quad",
-    category: "Meditation",
-    date: "Today",
-    time: "6:00 PM",
-    location: "Main Campus Quad",
-    attendees: 45,
-    points: 50,
-    gradient: "from-orange-400 to-rose-400",
-    image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=2720&auto=format&fit=crop"
-  },
-  {
-    id: 2,
-    title: "Acoustic Jam Session",
-    category: "Jam Session",
-    date: "Tomorrow",
-    time: "8:00 PM",
-    location: "Student Union Lounge",
-    attendees: 12,
-    points: 75,
-    gradient: "from-blue-400 to-cyan-400",
-    image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=2670&auto=format&fit=crop"
-  },
-  {
-    id: 3,
-    title: "Code & Coffee: Build a Bot",
-    category: "Coding",
-    date: "Thursday",
-    time: "10:00 AM",
-    location: "Innovation Lab 304",
-    attendees: 28,
-    points: 100,
-    gradient: "from-amber-400 to-yellow-500",
-    image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=2670&auto=format&fit=crop"
-  },
-  {
-    id: 4,
-    title: "Therapy Dogs Visit",
-    category: "Wellness",
-    date: "Friday",
-    time: "12:00 PM",
-    location: "Library Lobby",
-    attendees: 156,
-    points: 25,
-    gradient: "from-emerald-400 to-teal-400",
-    image: "https://images.unsplash.com/photo-1544568100-847a948585b9?q=80&w=2574&auto=format&fit=crop"
-  }
-];
+type EventQuest = {
+  id: string;
+  title: string;
+  category: string;
+  date: string;
+  time: string;
+  location: string;
+  attendees: number;
+  points: number;
+  gradient: string;
+  image: string;
+};
 
 const CATEGORIES = ["All", "Meditation", "Jam Session", "Coding", "Wellness"];
 
 export default function EventsPage() {
   const [activeCategory, setActiveCategory] = useState("All");
-  const [appliedEvents, setAppliedEvents] = useState<number[]>([]);
+  const [appliedEvents, setAppliedEvents] = useState<string[]>([]);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const filteredEvents = activeCategory === "All" 
-    ? MOCK_EVENTS 
-    : MOCK_EVENTS.filter(e => e.category === activeCategory);
+  const { data: events } = useQuery<EventQuest[]>({
+    queryKey: ["/api/events"],
+  });
 
-  const handleApply = (id: number) => {
+  // Fetch user's applied events
+  const { data: userApplications } = useQuery<string[]>({
+    queryKey: ["/api/events/user/applications"],
+  });
+
+  // Initialize appliedEvents state when userApplications data is loaded
+  useEffect(() => {
+    if (userApplications) {
+      setAppliedEvents(userApplications);
+    }
+  }, [userApplications]);
+
+  const applyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/events/${id}/apply`);
+      return (await res.json()) as EventQuest;
+    },
+    onSuccess: (updated, id) => {
+      // Update the events list
+      queryClient.setQueryData<EventQuest[]>(["/api/events"], (old) =>
+        old ? old.map((e) => (e.id === updated.id ? updated : e)) : [updated],
+      );
+
+      // Update applied events list
+      queryClient.setQueryData<string[]>(["/api/events/user/applications"], (old) =>
+        old ? [...old, id] : [id],
+      );
+
+      // Invalidate profile and dashboard queries to refresh Joy Score
+      queryClient.invalidateQueries({ queryKey: ["/api/profile/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/student/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+
+      toast({
+        title: "Quest joined! 🎉",
+        description: `You earned ${updated.points} Joy Points!`,
+      });
+
+      // Trigger celebration
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Could not apply",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredEvents =
+    activeCategory === "All"
+      ? events || []
+      : (events || []).filter((e) => e.category === activeCategory);
+
+  // Sort quests: active first (newest first), then completed (newest first)
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
+    // Determine completion status for each event
+    const now = new Date();
+    let aDateTime = new Date(a.date);
+    if (a.time) {
+      const [h, m] = a.time.split(":");
+      if (!isNaN(Number(h)) && !isNaN(Number(m))) {
+        aDateTime.setHours(Number(h), Number(m));
+      }
+    }
+    const aCompleted = aDateTime <= now;
+
+    let bDateTime = new Date(b.date);
+    if (b.time) {
+      const [h, m] = b.time.split(":");
+      if (!isNaN(Number(h)) && !isNaN(Number(m))) {
+        bDateTime.setHours(Number(h), Number(m));
+      }
+    }
+    const bCompleted = bDateTime <= now;
+
+    // Active quests before completed
+    if (!aCompleted && bCompleted) return -1;
+    if (aCompleted && !bCompleted) return 1;
+
+    // Within the same group (active or completed), sort by creation time descending (newest first)
+    // Since we don't have createdAt in the frontend, we'll assume the order from backend is already by createdAt desc
+    // But to be safe, we can sort by id or something, but for now, keep the backend order
+    return 0; // Maintain backend order within groups
+  });
+
+  const handleApply = (id: string) => {
     if (appliedEvents.includes(id)) return;
-    
-    setAppliedEvents(prev => [...prev, id]);
-    
-    // Confetti pop!
+
+    setAppliedEvents((prev) => [...prev, id]);
+    applyMutation.mutate(id);
+
     const duration = 3 * 1000;
     const animationEnd = Date.now() + duration;
     const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
 
-    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+    const randomInRange = (min: number, max: number) =>
+      Math.random() * (max - min) + min;
 
-    const interval: any = setInterval(function() {
+    const interval: any = setInterval(function () {
       const timeLeft = animationEnd - Date.now();
 
       if (timeLeft <= 0) {
@@ -86,8 +145,18 @@ export default function EventsPage() {
       }
 
       const particleCount = 50 * (timeLeft / duration);
-      confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
-      confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+      confetti(
+        Object.assign({}, defaults, {
+          particleCount,
+          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+        }),
+      );
+      confetti(
+        Object.assign({}, defaults, {
+          particleCount,
+          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+        }),
+      );
     }, 250);
   };
 
@@ -126,16 +195,42 @@ export default function EventsPage() {
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         <AnimatePresence mode="popLayout">
-          {filteredEvents.map((event, i) => (
-            <motion.div
+          {filteredEvents.map((event, i) => {
+            const eventId = (event as any).id || (event as any)._id || "";
+            // ensure we treat id uniformly
+            const applied = appliedEvents.includes(eventId);
+            // determine if the quest date/time has already passed
+            const now = new Date();
+            // build a JS Date from the stored date/time strings; our backend may store
+            // `date` as an ISO string (which already contains a time component) so we
+            // parse it and then override the hours/minutes with `event.time` if
+            // provided. This avoids invalid strings like "2025-01-01T00:00:00.000ZT13:00".
+            let eventDateTime = new Date(event.date);
+            if (event.time) {
+              const [h, m] = event.time.split(":");
+              if (!isNaN(Number(h)) && !isNaN(Number(m))) {
+                eventDateTime.setHours(Number(h), Number(m));
+              }
+            }
+            const isCompleted = eventDateTime <= now;
+            return (
+          <motion.div
               layout
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.3 }}
-              key={event.id}
-              className="glass-card rounded-[2rem] overflow-hidden flex flex-col group h-full"
+              key={eventId}
+              className={`glass-card rounded-[2rem] overflow-hidden flex flex-col group h-full ${
+                isCompleted ? "opacity-50" : ""
+              }`}
             >
+              {/* show a badge for completed quests */}
+              {isCompleted && (
+                <div className="absolute top-4 left-4 bg-green-600 text-white px-3 py-1 rounded-full font-bold text-sm shadow-lg z-10">
+                  Completed
+                </div>
+              )}
               {/* Image Header */}
               <div className="relative h-48 overflow-hidden">
                 <img 
@@ -162,7 +257,7 @@ export default function EventsPage() {
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center gap-3 text-muted-foreground font-medium">
                     <Calendar className="w-5 h-5 text-primary" />
-                    {event.date} • {event.time}
+                      {new Date(event.date).toLocaleDateString()} • {event.time}
                   </div>
                   <div className="flex items-center gap-3 text-muted-foreground font-medium">
                     <MapPin className="w-5 h-5 text-secondary" />
@@ -176,18 +271,29 @@ export default function EventsPage() {
 
                 {/* Action */}
                 <div className="mt-auto pt-4 border-t">
-                  <Button 
-                    onClick={() => handleApply(event.id)}
-                    variant={appliedEvents.includes(event.id) ? "secondary" : "default"}
+                  <Button
+                    onClick={() => handleApply(eventId)}
+                    variant={
+                      isCompleted
+                        ? "secondary"
+                        : applied
+                        ? "secondary"
+                        : "default"
+                    }
+                    disabled={isCompleted}
                     className={`w-full h-14 rounded-2xl text-lg font-bold transition-all duration-300 ${
-                      appliedEvents.includes(event.id) 
-                        ? "bg-green-500/10 text-green-600 hover:bg-green-500/20" 
+                      isCompleted
+                        ? "opacity-50 cursor-not-allowed"
+                        : applied
+                        ? "bg-green-500/10 text-green-600 hover:bg-green-500/20"
                         : "shadow-dopamine hover:shadow-dopamine-hover"
                     }`}
                   >
-                    {appliedEvents.includes(event.id) ? (
-                      <motion.span 
-                        initial={{ opacity: 0, y: 10 }} 
+                    {isCompleted ? (
+                      "Quest Completed"
+                    ) : applied ? (
+                      <motion.span
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="flex items-center justify-center gap-2"
                       >
@@ -200,7 +306,8 @@ export default function EventsPage() {
                 </div>
               </div>
             </motion.div>
-          ))}
+          );
+        })}
         </AnimatePresence>
       </div>
     </div>

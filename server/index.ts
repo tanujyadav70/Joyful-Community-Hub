@@ -1,10 +1,18 @@
 import express, { type Request, Response, NextFunction } from "express";
+// load environment variables from .env file as early as possible
+import dotenv from "dotenv";
+dotenv.config();
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
+import Memorystore from "memorystore";
+
 const app = express();
 const httpServer = createServer(app);
+
+const MemoryStore = Memorystore(session);
 
 declare module "http" {
   interface IncomingMessage {
@@ -20,7 +28,29 @@ app.use(
   }),
 );
 
+import path from "path";
+
 app.use(express.urlencoded({ extended: false }));
+
+// Serve uploaded images
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "dev-secret",
+    resave: false,
+    saveUninitialized: false,
+    store: new MemoryStore({
+      checkPeriod: 24 * 60 * 60 * 1000,
+    }),
+    cookie: {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
+  }),
+);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -60,6 +90,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // establish database connection before registering routes
+  const { connectDB } = await import("./db");
+  await connectDB();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -94,7 +127,6 @@ app.use((req, res, next) => {
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);

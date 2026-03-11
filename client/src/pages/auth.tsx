@@ -1,25 +1,82 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, ArrowRight, UserPlus, LogIn } from "lucide-react";
+import { Sparkles, UserPlus, LogIn } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import authBg from "@/assets/images/auth-bg.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
   const [isLogin, setIsLogin] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    // Simulate auth
-    setTimeout(() => {
-      setIsSubmitting(false);
+  const loginMutation = useMutation({
+    mutationFn: async (payload: { email: string; password: string }) => {
+      const res = await apiRequest("POST", "/api/auth/login", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setLocation("/home");
-    }, 1500);
+    },
+    onError: async (error: any) => {
+      const message = error?.message || "Login failed. Please try again.";
+      toast({
+        title: "Login failed",
+        description: message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (payload: { email: string; password: string; name?: string }) => {
+      const res = await apiRequest("POST", "/api/auth/register", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setLocation("/home");
+    },
+    onError: async (error: any) => {
+      const message = error?.message || "Could not create your account.";
+      toast({
+        title: "Sign up failed",
+        description: message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const isSubmitting = loginMutation.isPending || registerMutation.isPending;
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = (formData.get("email") as string | null)?.trim() || "";
+    const password = (formData.get("password") as string | null)?.trim() || "";
+    const name = (formData.get("name") as string | null)?.trim() || undefined;
+
+    if (!email || !password) {
+      toast({
+        title: "Missing information",
+        description: "Please enter your campus email and password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isLogin) {
+      loginMutation.mutate({ email, password });
+    } else {
+      registerMutation.mutate({ email, password, name });
+    }
   };
 
   return (
@@ -96,6 +153,7 @@ export default function AuthPage() {
                   <Label htmlFor="name">Full Name</Label>
                   <Input 
                     id="name" 
+                    name="name"
                     placeholder="e.g. Joyful Student" 
                     className="h-14 rounded-2xl bg-white dark:bg-zinc-900 border-2 focus-visible:ring-0 focus-visible:border-primary text-lg px-4 transition-all" 
                   />
@@ -107,6 +165,7 @@ export default function AuthPage() {
               <Label htmlFor="email">Campus Email</Label>
               <Input 
                 id="email" 
+                name="email"
                 type="email" 
                 placeholder="you@campus.edu" 
                 required
@@ -125,6 +184,7 @@ export default function AuthPage() {
               </div>
               <Input 
                 id="password" 
+                name="password"
                 type="password" 
                 placeholder="••••••••" 
                 required

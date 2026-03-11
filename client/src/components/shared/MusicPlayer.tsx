@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Play, Pause, SkipForward, SkipBack, Volume2, Heart } from "lucide-react";
 import { motion } from "framer-motion";
 import musicCover from "@/assets/images/music-cover.png";
@@ -6,6 +6,37 @@ import musicCover from "@/assets/images/music-cover.png";
 export default function MusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLiked, setIsLiked] = useState(true);
+   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = new Audio(
+      "/music/Luke-Bergs-Shine-Like-The-Sun(chosic.com).mp3",
+    );
+    audio.loop = true;
+    audioRef.current = audio;
+
+    return () => {
+      audio.pause();
+      audioRef.current = null;
+    };
+  }, []);
+
+  const togglePlay = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      try {
+        await audio.play();
+        setIsPlaying(true);
+      } catch {
+        setIsPlaying(false);
+      }
+    }
+  };
 
   return (
     <div className="h-[80px] bg-white/80 dark:bg-black/80 backdrop-blur-2xl border-t border-white/20 dark:border-white/10 flex items-center px-4 md:px-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
@@ -49,7 +80,7 @@ export default function MusicPlayer() {
           </button>
           
           <button 
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={togglePlay}
             className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/30 hover:scale-105 transition-transform"
           >
             {isPlaying ? (

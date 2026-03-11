@@ -23,13 +23,14 @@ function Router() {
       <Route path="/register" component={AuthPage} />
       
       {/* Protected Routes wrapped in AppLayout */}
-      <Route path="/:rest*">
+      <Route>
         <AppLayout>
           <Switch>
             <Route path="/home" component={HomeFeed} />
             <Route path="/events" component={EventsPage} />
             <Route path="/student/dashboard" component={StudentDashboard} />
             <Route path="/admin/dashboard" component={AdminDashboard} />
+            <Route path="/faculty-command" component={AdminDashboard} />
             <Route path="/profile/:id" component={ProfilePage} />
             <Route component={NotFound} />
           </Switch>
