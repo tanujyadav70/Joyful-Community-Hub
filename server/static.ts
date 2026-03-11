@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 export function serveStatic(app: Express) {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const __dirname = process.cwd();
   const distPath = path.resolve(__dirname, "../public");
   if (!fs.existsSync(distPath)) {
     throw new Error(
