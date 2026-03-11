@@ -7,12 +7,12 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
-import Memorystore from "memorystore";
+import MongoStore from "connect-mongo";
 
 const app = express();
 const httpServer = createServer(app);
 
-const MemoryStore = Memorystore(session);
+
 
 declare module "http" {
   interface IncomingMessage {
@@ -40,8 +40,9 @@ app.use(
     secret: process.env.SESSION_SECRET || "dev-secret",
     resave: false,
     saveUninitialized: false,
-    store: new MemoryStore({
-      checkPeriod: 24 * 60 * 60 * 1000,
+    store: MongoStore.create({ 
+      mongoUrl: process.env.MONGO_URI, // Use your existing env variable
+      ttl: 7 * 24 * 60 * 60 // Sessions last 7 days
     }),
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000,
