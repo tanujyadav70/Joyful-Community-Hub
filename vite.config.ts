@@ -28,18 +28,18 @@ export default defineConfig({
       : []),
   ],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "client", "src"),
-      "@shared": path.resolve(__dirname, "shared"),
-      "@assets": path.resolve(__dirname, "attached_assets"),
-    },
+  alias: {
+    "@": path.resolve(__dirname, "client/src"),           // main src folder
+    "@shared": path.resolve(__dirname, "shared"),        // shared folder at root
+    "@assets": path.resolve(__dirname, "client/src/assets"), // assets inside src
   },
+},
   css: {
     postcss: {
       plugins: [],
     },
   },
-  root: path.resolve(__dirname, "client"),
+  root: "client", // simpler and works correctly on Linux
   build: {
     outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
