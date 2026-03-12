@@ -6,9 +6,8 @@ export function serveStatic(app: Express) {
   // Use current working directory
   const __dirname = process.cwd();
 
-  // Match the output folder of the Vite build (see `vite.config.ts` -> `build.outDir`)
-  // Vite is configured with `root: "client"` and `outDir: <repoRoot>/dist`.
-  const distPath = path.resolve(process.cwd(), "dist");
+  // Match the output folder of the Vite build (see `vite.config.ts` -> `root` + `build.outDir`)
+  const distPath = path.resolve(process.cwd(), "client", "dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(

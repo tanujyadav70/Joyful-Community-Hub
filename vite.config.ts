@@ -41,7 +41,8 @@ export default defineConfig({
   },
   root: "client", // simpler and works correctly on Linux
   build: {
-    outDir: path.resolve(__dirname, "dist"),
+    // Output into `client/dist` (relative to `root`)
+    outDir: "dist",
     emptyOutDir: true,
   },
   server: {

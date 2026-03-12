@@ -5,7 +5,7 @@ import path from "path";
 async function buildAll() {
   // Remove previous build
   // Keep output in sync with `vite.config.ts` (`build.outDir`) and server static hosting.
-  await rm(path.resolve("dist"), { recursive: true, force: true });
+  await rm(path.resolve("client", "dist"), { recursive: true, force: true });
 
   console.log("building client...");
   await viteBuild({
