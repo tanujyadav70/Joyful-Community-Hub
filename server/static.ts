@@ -7,7 +7,7 @@ export function serveStatic(app: Express) {
   const __dirname = process.cwd();
 
   // Match the output folder of your Vite build
-  const distPath = path.resolve(__dirname, "dist/public");
+  const distPath = path.resolve(process.cwd(), "client/dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
