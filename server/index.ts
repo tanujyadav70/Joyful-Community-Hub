@@ -14,6 +14,10 @@ import createMemoryStore from "memorystore";
 const app = express();
 const httpServer = createServer(app);
 
+// Render (and many PaaS) terminate TLS at a proxy/load balancer.
+// Trust the proxy so `req.secure` is correct and secure cookies work.
+app.set("trust proxy", 1);
+
 
 
 declare module "http" {
@@ -42,6 +46,7 @@ app.use(
     secret: process.env.SESSION_SECRET || "dev-secret",
     resave: false,
     saveUninitialized: false,
+    proxy: process.env.NODE_ENV === "production",
     store: (() => {
       const mongoUrl = process.env.MONGO_URI;
       if (mongoUrl) {
@@ -62,7 +67,8 @@ app.use(
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      // Use secure cookies in production, but auto-detect HTTPS behind proxies.
+      secure: process.env.NODE_ENV === "production" ? "auto" : false,
     },
   }),
 );
