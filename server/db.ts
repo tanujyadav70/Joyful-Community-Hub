@@ -13,8 +13,12 @@ export async function connectDB() {
     });
     console.log("Connected to MongoDB");
   } catch (err) {
-    console.error("Error connecting to MongoDB", err);
-    process.exit(1);
+    const message =
+      process.env.MONGO_URI
+        ? "Error connecting to MongoDB"
+        : "Error connecting to MongoDB (MONGO_URI not set; using localhost fallback)";
+    console.error(message, err);
+    throw err;
   }
 }
 

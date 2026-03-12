@@ -4,15 +4,15 @@ import path from "path";
 
 async function buildAll() {
   // Remove previous build
-  await rm(path.resolve("client/dist"), { recursive: true, force: true });
+  // Keep output in sync with `vite.config.ts` (`build.outDir`) and server static hosting.
+  await rm(path.resolve("dist"), { recursive: true, force: true });
 
   console.log("building client...");
   await viteBuild({
-    root: path.resolve("client"),
-    build: {
-      outDir: path.resolve("client/dist"),
-      emptyOutDir: true,
-    },
+    // Ensure the build uses the repo's Vite config (aliases/plugins/etc.).
+    // `vite.config.ts` already sets `root: "client"` and `build.outDir`.
+    configFile: path.resolve("vite.config.ts"),
+    mode: "production",
   });
 
   console.log("client build completed ✅");

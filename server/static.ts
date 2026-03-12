@@ -6,8 +6,9 @@ export function serveStatic(app: Express) {
   // Use current working directory
   const __dirname = process.cwd();
 
-  // Match the output folder of your Vite build
-  const distPath = path.resolve(process.cwd(), "client/dist");
+  // Match the output folder of the Vite build (see `vite.config.ts` -> `build.outDir`)
+  // Vite is configured with `root: "client"` and `outDir: <repoRoot>/dist`.
+  const distPath = path.resolve(process.cwd(), "dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
@@ -23,7 +24,8 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   // Fall back to index.html for SPA routing
-  app.get("*", (_req, res) => {
+  // Express 5 / path-to-regexp doesn't accept `"*"` as a path pattern.
+  app.get(/.*/, (_req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
   });
 }

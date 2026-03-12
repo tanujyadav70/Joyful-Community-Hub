@@ -9,6 +9,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 
 import MongoStore from "connect-mongo";
+import createMemoryStore from "memorystore";
 
 const app = express();
 const httpServer = createServer(app);
@@ -41,10 +42,22 @@ app.use(
     secret: process.env.SESSION_SECRET || "dev-secret",
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
-      mongoUrl: process.env.MONGO_URI, // Use your existing env variable
-      ttl: 7 * 24 * 60 * 60 // Sessions last 7 days
-    }),
+    store: (() => {
+      const mongoUrl = process.env.MONGO_URI;
+      if (mongoUrl) {
+        return MongoStore.create({
+          mongoUrl,
+          ttl: 7 * 24 * 60 * 60, // 7 days
+        });
+      }
+
+      // Fallback for environments where Mongo isn't configured (e.g. preview builds).
+      // In production you should set `MONGO_URI` to persist sessions across restarts.
+      const MemoryStore = createMemoryStore(session);
+      return new MemoryStore({
+        checkPeriod: 24 * 60 * 60 * 1000, // prune expired entries daily
+      });
+    })(),
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
