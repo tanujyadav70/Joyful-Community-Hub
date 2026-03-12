@@ -1,3 +1,4 @@
+console.log("Starting server…"); 
 import express, { type Request, Response, NextFunction } from "express";
 // load environment variables from .env file as early as possible
 import dotenv from "dotenv";
