@@ -3,12 +3,18 @@ import { rm } from "fs/promises";
 import path from "path";
 
 async function buildAll() {
-  const distPath = path.resolve("client", "dist"); // match your serveStatic
-  // Remove previous client build
-  await rm(distPath, { recursive: true, force: true });
+  // Remove previous build
+  await rm(path.resolve("client/dist"), { recursive: true, force: true });
 
   console.log("building client...");
-  await viteBuild();
+  await viteBuild({
+    root: path.resolve("client"),
+    build: {
+      outDir: path.resolve("client/dist"),
+      emptyOutDir: true,
+    },
+  });
+
   console.log("client build completed ✅");
 }
 
