@@ -10,66 +10,76 @@ export async function getPosts(req: Request, res: Response) {
   try {
     // fetch all posts from database and sort newest first
     const posts = await Post.find().sort({ createdAt: -1 });
-    console.log(`getPosts: returning ${posts.length} posts`);
+    console.log(`getPosts: found ${posts.length} posts in database`);
 
-    const transformed = await Promise.all(posts.map(async (post: any) => {
-      // Get author info but guard against invalid IDs (e.g. legacy "admin" string)
-      let authorName = "Anonymous";
-      if (mongoose.Types.ObjectId.isValid(post.userId)) {
-        try {
-          const user = await User.findById(post.userId).select("name username");
-          authorName = user?.name || user?.username || "Anonymous";
-        } catch (e) {
-          console.warn("getPosts: failed to lookup user", post.userId, e);
-        }
-      } else {
-        // handle special non-objectId values gracefully
-        if (post.userId === "admin") {
-          authorName = "Administrator";
+    const transformed: any[] = [];
+
+    // Process each post defensively so one bad document doesn't break the whole feed
+    for (const post of posts as any[]) {
+      try {
+        // Get author info but guard against invalid IDs (e.g. legacy "admin" string)
+        let authorName = "Anonymous";
+        if (mongoose.Types.ObjectId.isValid(post.userId)) {
+          try {
+            const user = await User.findById(post.userId).select("name username");
+            authorName = user?.name || user?.username || "Anonymous";
+          } catch (e) {
+            console.warn("getPosts: failed to lookup user", post.userId, e);
+          }
         } else {
-          authorName = "Unknown";
+          // handle special non-objectId values gracefully
+          if (post.userId === "admin") {
+            authorName = "Administrator";
+          } else {
+            authorName = "Unknown";
+          }
         }
+
+        const authorAvatar = authorName
+          .split(" ")
+          .map((p: string) => p.charAt(0).toUpperCase())
+          .join("")
+          .slice(0, 2);
+
+        // Get comment count
+        const commentCount = await Comment.countDocuments({ postId: post.id });
+
+        // Get like count
+        const likeCount = await Like.countDocuments({ postId: post.id });
+
+        // Check if current user liked this post
+        let userLiked = false;
+        if (req.session?.userId) {
+          const like = await Like.findOne({ postId: post.id, userId: req.session.userId });
+          userLiked = !!like;
+        }
+
+        transformed.push({
+          id: post.id,
+          author: {
+            name: authorName,
+            avatar: authorAvatar,
+            role: "Member",
+            userId: post.userId,
+          },
+          type: post.mediaType
+            ? post.mediaType.charAt(0).toUpperCase() + post.mediaType.slice(1)
+            : "Text",
+          content: post.text,
+          mediaUrl: post.mediaUrl,
+          mediaType: post.mediaType,
+          likes: likeCount,
+          comments: commentCount,
+          time: new Date(post.createdAt).toLocaleDateString(),
+          gradient: "from-purple-400 to-pink-500",
+          userLiked,
+        });
+      } catch (postError) {
+        console.error("getPosts: skipping malformed post", post?.id, postError);
       }
+    }
 
-      const authorAvatar = authorName
-        .split(" ")
-        .map((p: string) => p.charAt(0).toUpperCase())
-        .join("")
-        .slice(0, 2);
-
-      // Get comment count
-      const commentCount = await Comment.countDocuments({ postId: post.id });
-
-      // Get like count
-      const likeCount = await Like.countDocuments({ postId: post.id });
-
-      // Check if current user liked this post
-      let userLiked = false;
-      if (req.session?.userId) {
-        const like = await Like.findOne({ postId: post.id, userId: req.session.userId });
-        userLiked = !!like;
-      }
-
-      return {
-        id: post.id,
-        author: {
-          name: authorName,
-          avatar: authorAvatar,
-          role: "Member",
-          userId: post.userId,
-        },
-        type: post.mediaType ? post.mediaType.charAt(0).toUpperCase() + post.mediaType.slice(1) : "Text",
-        content: post.text,
-        mediaUrl: post.mediaUrl,
-        mediaType: post.mediaType,
-        likes: likeCount,
-        comments: commentCount,
-        time: new Date(post.createdAt).toLocaleDateString(),
-        gradient: "from-purple-400 to-pink-500",
-        userLiked,
-      };
-    }));
-
+    console.log(`getPosts: returning ${transformed.length} transformed posts`);
     res.json(transformed);
   } catch (error) {
     // eagerly log error and return empty list instead of 500 so that the
