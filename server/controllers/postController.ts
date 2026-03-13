@@ -7,9 +7,12 @@ import mongoose from "mongoose";
 import { Profile } from "../models/Profile";
 
 export async function getPosts(req: Request, res: Response) {
+  console.log("API /api/feed was called");
   try {
     // fetch all posts from database and sort newest first
-    const posts = await Post.find().sort({ createdAt: -1 });
+    const posts = await Post.find()
+  .sort({ createdAt: -1 })
+  .limit(20);
     console.log(`getPosts: found ${posts.length} posts in database`);
 
     const transformed: any[] = [];
@@ -42,20 +45,20 @@ export async function getPosts(req: Request, res: Response) {
           .slice(0, 2);
 
         // Get comment count
-        const commentCount = await Comment.countDocuments({ postId: post.id });
+        const commentCount = await Comment.countDocuments({ postId: post._id.toString() });
 
         // Get like count
-        const likeCount = await Like.countDocuments({ postId: post.id });
+        const likeCount = await Like.countDocuments({ postId: post._id.toString() });
 
         // Check if current user liked this post
         let userLiked = false;
         if (req.session?.userId) {
-          const like = await Like.findOne({ postId: post.id, userId: req.session.userId });
+          const like = await Like.findOne({ postId: post._id.toString(), userId: req.session.userId });
           userLiked = !!like;
         }
 
         transformed.push({
-          id: post.id,
+          id: post._id,
           author: {
             name: authorName,
             avatar: authorAvatar,
@@ -150,7 +153,7 @@ export async function createPost(req: Request, res: Response, next: NextFunction
       .slice(0, 2);
 
     const transformed = {
-      id: post.id,
+      id: post._id,
       author: {
         name: authorName,
         avatar: authorAvatar,
@@ -222,10 +225,10 @@ export async function createComment(req: Request, res: Response) {
     }
 
     const comment = new Comment({
-      postId,
-      userId,
-      text: text.trim(),
-    });
+    postId: postId.toString(),
+    userId,
+    text: text.trim(),
+  });
 
     await comment.save();
 
@@ -265,7 +268,7 @@ export async function toggleLike(req: Request, res: Response) {
     }
 
     // Check if like already exists
-    const existingLike = await Like.findOne({ postId, userId });
+    const existingLike = await Like.findOne({ postId: postId.toString(), userId });
 
     if (existingLike) {
       // Unlike
@@ -273,7 +276,7 @@ export async function toggleLike(req: Request, res: Response) {
       res.json({ liked: false });
     } else {
       // Like
-      const like = new Like({ postId, userId });
+      const like = new Like({ postId: postId.toString(), userId });
       await like.save();
 
       // Award Joy Points to the post author (if not self-like)
